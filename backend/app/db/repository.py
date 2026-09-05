@@ -13,6 +13,15 @@ from backend.app.models.market import MarketTemperature
 
 class MarketRepository:
     """Persistence operations for market snapshots and alerts."""
+    def get_alert_state(
+        self,
+        rule_id: int,
+    ) -> AlertState | None:
+        statement = select(AlertState).where(
+            AlertState.rule_id == rule_id
+        )
+
+        return self._session.scalar(statement)
 
     def __init__(self, session: Session) -> None:
         self._session = session

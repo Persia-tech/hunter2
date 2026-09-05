@@ -1,15 +1,20 @@
-"""Refresh Market Temperature data and evaluate alert rules."""
+"""Refresh Market Temperature data, evaluate alerts, and deliver notifications."""
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
 from backend.app.db.database import SessionLocal
 from backend.app.db.repository import MarketRepository
 from backend.app.models.market import Asset, AssetClass
 from backend.app.providers.yfinance_provider import YFinanceProvider
-from backend.app.services.alert_processor import AlertNotification, AlertProcessor
+from backend.app.services.alert_processor import (
+    AlertNotification,
+    AlertProcessor,
+)
 from backend.app.services.market_temperature import calculate_temperature
+from bot.alert_sender import send_alert_notification
 
 
 MARKET_ASSETS = [
@@ -43,7 +48,7 @@ class RefreshResult:
     notifications: list[AlertNotification]
 
 
-def refresh_market_temperature() -> RefreshResult:
+async def refresh_market_temperature() -> RefreshResult:
     provider = YFinanceProvider()
 
     processed = 0
@@ -81,21 +86,35 @@ def refresh_market_temperature() -> RefreshResult:
                     temperature
                 )
 
+                for notification in asset_notifications:
+                    state = repository.get_alert_state(
+                        notification.rule_id
+                    )
+
+                    if state is None:
+                        raise RuntimeError(
+                            f"Alert state missing for rule "
+                            f"{notification.rule_id}"
+                        )
+
+                    await send_alert_notification(
+                        notification,
+                        state,
+                    )
+
+                repository.commit()
+
                 notifications.extend(asset_notifications)
                 processed += 1
 
             except Exception as exc:
+                repository.rollback()
                 failed += 1
+
                 print(
                     f"[WARN] {asset.symbol} refresh failed: "
                     f"{type(exc).__name__}: {exc}"
                 )
-
-        try:
-            repository.commit()
-        except Exception:
-            repository.rollback()
-            raise
 
     return RefreshResult(
         processed=processed,
@@ -104,8 +123,8 @@ def refresh_market_temperature() -> RefreshResult:
     )
 
 
-def main() -> None:
-    result = refresh_market_temperature()
+async def main() -> None:
+    result = await refresh_market_temperature()
 
     print(
         f"Processed: {result.processed}, "
@@ -115,7 +134,7 @@ def main() -> None:
 
     for notification in result.notifications:
         print(
-            "[ALERT] "
+            "[DELIVERED] "
             f"user={notification.telegram_user_id} "
             f"symbol={notification.symbol} "
             f"metric={notification.metric} "
@@ -124,4 +143,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
