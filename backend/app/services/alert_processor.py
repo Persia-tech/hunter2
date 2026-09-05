@@ -1,4 +1,4 @@
-"""End-to-end alert processing for Hunter2."""
+﻿"""End-to-end alert processing for Hunter2."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ class AlertProcessor:
                 apply_evaluation_to_state(
                     state,
                     evaluation,
-                    notified=evaluation.should_notify,
+                    notified=False,
                 )
 
             except AlertEvaluationError:
