@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
+
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.database import Base
@@ -16,6 +25,13 @@ def utc_now() -> datetime:
 
 class MarketSnapshot(Base):
     __tablename__ = "market_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "symbol",
+            "as_of",
+            name="uq_market_snapshots_symbol_as_of",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
